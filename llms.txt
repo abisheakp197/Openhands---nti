@@ -1,0 +1,85 @@
+# openhands-nti
+
+> Drop-in Neutral Trust Infrastructure (NTI) guardrail for the OpenHands agent
+> framework. Intercepts every OpenHands tool action (bash, Python, file edits,
+> browser/web, MCP, client tools), signs it with ML-DSA-87, and verifies it
+> against a Merkle delegation chain before execution. Fail-closed.
+
+## Install
+
+    pip install openhands-nti
+    pip install "openhands-nti[openhands]"
+
+## One-line usage
+
+    from openhands_nti import NTIGuardrail
+
+    NTIGuardrail(
+        agent_did="did:webvh:z6Mk...:agents.example.com",
+        key_pair=key_pair,                 # ube_foundation.PqcKeyPair (ML-DSA-87)
+        delegation_chain=delegation_chain,
+    ).install()
+
+    # ... run your OpenHands agent as usual ...
+
+`install()` patches `openhands.sdk.tool.tool.ToolDefinition.__call__`, the single
+method every tool call funnels through. `uninstall()` restores it. The guardrail
+also works as a context manager.
+
+## Public API
+
+- `NTIGuardrail(agent_did, key_pair, delegation_chain, verification_method=None,
+  engine=None, capability_overrides=None, capability_resolver=None,
+  float_policy="round", float_digits=15, audit_path=None, on_block=None)`
+- `NTIGuardrail.install()` / `.uninstall()` / `.authorize(tool, action)`
+- `install_guardrail(**kwargs)` - build and install in one call
+- `verify_receipt(receipt, public_key)` - verify a receipt signature
+- `build_receipt(...)`, `parse_tagged_signature(tag)`, `format_tagged_signature(sig)`
+- `canonical_json(value, float_policy=..., float_digits=...)`, `action_message(...)`
+- `build_proof(chain, subject, capability)`, `verify_proof(chain, proof)`,
+  `merkle_root(leaves)`, `leaf_hash(record)`, `node_hash(left, right)`
+- `capability_for(tool_name, overrides=None, resolver=None)`,
+  `DEFAULT_TOOL_CAPABILITIES`
+- `AuditTrail(path=None)` with `.records` and `.incidents()`
+
+## Behavior
+
+For each action, in order, all fail-closed:
+
+1. Map the tool name to an NTI capability.
+2. Prove a delegation record granting that capability to the agent DID is
+   included in the Merkle chain (RFC 6962, NTI domain separators).
+3. Canonicalize and sign with ML-DSA-87 over
+   `(request_id, actor, capability, action, input)`.
+4. Ask the NTI TrustEngine for a verdict; anything but `Allow` blocks.
+5. Run the original tool and attach the signed receipt as
+   `observation.nti_receipt`.
+
+Any failure raises `NTIBlocked`, records an incident, and prevents execution.
+
+## Receipts
+
+`ml_dsa_87_signature` uses the NTI tagged form `ml-dsa-87:{length}:{hex}`.
+Signatures are raw ML-DSA-87 bytes, never DER-encoded ECDSA. The signing payload
+is domain-separated (`nti-openhands-action-v1:`) and length-prefixed.
+
+## Capability mapping (defaults)
+
+- `bash`, `terminal`, `execute_bash` -> `shell.execute`
+- `str_replace_editor`, `file_editor`, `apply_patch` -> `file.write`
+- `browser`, `browser_use`, `fetch`, `web_search` -> `web.fetch`
+- `think` -> `agent.think`, `finish` -> `agent.finish`, `task_tracker` -> `agent.plan`
+- unknown tools -> `tool.<name>`
+
+## Security
+
+Fail-closed by design. ML-DSA-87 via `ube-foundation`. Canonicalization is a
+security boundary; see SECURITY.md for the float-canonicalization hazard and the
+`float_policy` controls.
+
+## Links
+
+- Source: https://github.com/abisheakp197/openhands-nti
+- NTI core: https://github.com/abisheakp197/Neutral-Trust-Infrastructure
+- OpenHands SDK: https://github.com/OpenHands/software-agent-sdk
+- License: Apache-2.0

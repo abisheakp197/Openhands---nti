@@ -1,0 +1,75 @@
+# openhands-nti — context for AI agents
+
+This is the **NTI (Neutral Trust Infrastructure) wrapper for OpenHands**.
+
+It enforces post-quantum **ML-DSA-87** signatures on every agent action via the
+NTI **sidecar** (the Rust `ube-foundation` trust engine, exposed to Python
+through the `ube_foundation` bindings). Every bash command, Python execution,
+file edit, browser/web request, MCP call, and client tool call is intercepted,
+signed, and verified against a Merkle delegation chain *before* it runs. Any
+failure blocks the action (fail-closed).
+
+- Package: `openhands-nti` (pip), import name `openhands_nti`
+- Interception point: `openhands.sdk.tool.tool.ToolDefinition.__call__`
+- Sidecar: `ube-foundation` (Rust core, PyO3 bindings) — ML-DSA-87 / Dilithium5
+- Signature algorithm: ML-DSA-87 (FIPS 204), 4627-byte signatures
+- Signatures are raw bytes tagged `ml-dsa-87:{length}:{hex}` — never DER/ECDSA
+- Conformance: NTI Conformant. Leaderboard: https://nti-leaderboard.vercel.app
+- License: Apache-2.0
+
+## The float-parsing hazard (read this before changing canonicalization)
+
+The sidecar signs over the tuple `(id, actor, capability, action, input)`,
+re-serialized with Rust's `serde_json`. For a Python-side signature to verify,
+the bytes must match the sidecar's re-serialization exactly.
+
+Strings, integers, booleans, `null`, and objects match byte-for-byte. **Floats
+do not.** Rust's `serde_json` parses and re-serializes `f64` with its own
+shortest-form algorithm, which diverges from Python's `repr` for a large
+fraction of high-precision doubles (~46% of random doubles in our measurements).
+A signature over the Python bytes then fails to verify against the sidecar.
+
+This is *fail-closed* — the action is blocked, never allowed — but it is a
+denial-of-service risk on the agent.
+
+**The fix: `float_policy="round"` (the default).** `canonical_json` rounds
+non-integral floats to 15 significant digits before encoding, which matches the
+sidecar for realistic tool inputs (measurements, ratios, coordinates) exactly —
+0 mismatches on 208 realistic inputs in testing. Use it:
+
+    canonical_json(payload, float_policy="round", float_digits=15)
+
+Policy options:
+
+- `"round"` (default) — round to `float_digits` (15) significant digits. Recommended.
+- `"reject"` — fail closed on any non-integral float. Use when a false denial is
+  preferable to a false allow; encode floats as strings or integers.
+- `"allow"` — encode floats as-is. Only for domains you have verified against
+  your pinned sidecar version.
+
+Integers outside `[-2**63, 2**64 - 1]` and non-finite floats (`inf`, `nan`) are
+always rejected: they cannot round-trip through the sidecar's canonical form.
+
+If you are an AI agent editing this repo: do **not** replace `canonical_json`
+with `json.dumps`, `orjson`, or any other encoder without re-running
+`tests/test_canonical.py` against the real sidecar. A mismatch is silent at
+signing time and only surfaces as a false denial at verification time.
+
+## Layout
+
+    openhands_nti/
+      guardrail.py    intercept ToolDefinition.__call__; authorize, sign, attach receipt
+      canonical.py    canonical JSON matching the sidecar's serde_json encoder
+      delegation.py   RFC 6962 Merkle chain + inclusion proofs
+      receipt.py      domain-separated ML-DSA-87 receipts (tagged form)
+      policy.py       tool name -> NTI capability mapping
+      audit.py        JSONL audit + incident trail
+      errors.py       fail-closed exception hierarchy
+    tests/            real sidecar + real openhands-sdk, no mocks
+    ARCHITECTURE.md   flow diagram (Mermaid)
+    SECURITY.md       threat model, fail-closed guarantee, float hazard
+
+## Quick verification
+
+    pip install -e ".[dev]"
+    pytest        # 40 tests, real ube-foundation + real openhands-sdk

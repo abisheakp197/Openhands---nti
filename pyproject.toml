@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openhands-nti"
+version = "0.1.0"
+description = "Drop-in Neutral Trust Infrastructure guardrail for OpenHands: ML-DSA-87 signed receipts and Merkle delegation-chain verification on every agent action."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Abisheak", email = "abisheakp197@gmail.com" }]
+keywords = [
+    "openhands",
+    "nti",
+    "neutral-trust-infrastructure",
+    "ml-dsa-87",
+    "post-quantum",
+    "agent-security",
+    "merkle",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security :: Cryptography",
+]
+dependencies = [
+    "ube-foundation>=0.1.7",
+]
+
+[project.optional-dependencies]
+openhands = ["openhands-sdk>=1.0.0"]
+dev = [
+    "openhands-sdk>=1.0.0",
+    "pytest>=8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/abisheakp197/openhands-nti"
+Repository = "https://github.com/abisheakp197/openhands-nti"
+"Bug Tracker" = "https://github.com/abisheakp197/openhands-nti/issues"
+
+[tool.setuptools.packages.find]
+include = ["openhands_nti*"]
+
+[tool.setuptools.package-data]
+openhands_nti = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
