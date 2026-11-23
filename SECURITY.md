@@ -92,7 +92,10 @@ deliberately, because a false denial is a denial of service on the agent.
 * `"round"` (default) rounds non-integral floats to `float_digits` (default 15)
   significant digits before encoding. Realistic tool inputs -- measurements,
   ratios, coordinates with a handful of decimal places -- verify exactly. This
-  is the recommended setting.
+  is the recommended setting. Note it is a default, not an enforcement: it can
+  be overridden per call and on `NTIGuardrail(...)`, so a caller passing `"allow"`
+  gets unrounded bytes. Rounding also signs over the rounded value, so
+  `0.12345678901234568` is signed as `0.123456789012346`.
 * `"reject"` fails closed on any non-integral float. Use it when a false denial
   is preferable to a false allow, and encode floats as strings or integers.
 * `"allow"` encodes floats as-is. Use only when you have verified parity for your

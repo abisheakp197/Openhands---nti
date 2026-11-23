@@ -24,10 +24,11 @@ Floats
 ------
 Cross-language float canonicalization is the one place where Python and Rust
 disagree. ``serde_json`` parses and re-serializes ``f64`` values with its own
-shortest-form algorithm, and for a non-trivial fraction of doubles the bytes it
-produces differ from Python's ``repr``. A signature computed over Python's bytes
-then fails to verify against the engine, which is a *fail-closed* outcome: the
-action is blocked, never allowed. See ``float_policy`` below and ``SECURITY.md``.
+shortest-form algorithm, and for a non-trivial fraction of full-precision
+doubles the bytes it produces differ from Python's ``repr``. A signature
+computed over Python's bytes then fails to verify against the engine, which is
+a *fail-closed* outcome: the action is blocked, never allowed. See
+``float_policy`` below and ``SECURITY.md``.
 """
 
 from __future__ import annotations

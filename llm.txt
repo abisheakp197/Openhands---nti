@@ -24,20 +24,27 @@ re-serialized with Rust's `serde_json`. For a Python-side signature to verify,
 the bytes must match the sidecar's re-serialization exactly.
 
 Strings, integers, booleans, `null`, and objects match byte-for-byte. **Floats
-do not.** Rust's `serde_json` parses and re-serializes `f64` with its own
-shortest-form algorithm, which diverges from Python's `repr` for a large
-fraction of high-precision doubles (~46% of random doubles in our measurements).
-A signature over the Python bytes then fails to verify against the sidecar.
+are the exception.** Rust's `serde_json` parses and re-serializes `f64` with its
+own shortest-form algorithm, which for a non-trivial fraction of full-precision
+doubles produces different bytes from Python's `repr`. A signature over the
+Python bytes then fails to verify against the sidecar.
 
 This is *fail-closed* — the action is blocked, never allowed — but it is a
 denial-of-service risk on the agent.
 
-**The fix: `float_policy="round"` (the default).** `canonical_json` rounds
+**Mitigation: `float_policy="round"` (the default).** `canonical_json` rounds
 non-integral floats to 15 significant digits before encoding, which matches the
-sidecar for realistic tool inputs (measurements, ratios, coordinates) exactly —
-0 mismatches on 208 realistic inputs in testing. Use it:
+sidecar for realistic tool inputs (measurements, ratios, coordinates with a
+handful of decimal places) — 0 mismatches on 208 realistic inputs in testing.
+Use it:
 
     canonical_json(payload, float_policy="round", float_digits=15)
+
+Two limits worth knowing. `"round"` is a default, not an enforcement: it can be
+overridden per call and on `NTIGuardrail(...)`, so a caller who passes `"allow"`
+gets unrounded bytes and the mismatch returns. And rounding is lossy — it signs
+over the rounded value, so `0.12345678901234568` is signed as
+`0.123456789012346`. Do not round a value whose exact digits carry meaning.
 
 Policy options:
 
