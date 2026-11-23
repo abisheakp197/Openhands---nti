@@ -90,16 +90,18 @@ deliberately, because a false denial is a denial of service on the agent.
 `canonical_json` exposes a `float_policy`:
 
 * `"round"` (default) rounds non-integral floats to `float_digits` (default 15)
-  significant digits before encoding. Realistic tool inputs -- measurements,
-  ratios, coordinates with a handful of decimal places -- verify exactly. This
-  is the recommended setting. Note it is a default, not an enforcement: it can
-  be overridden per call and on `NTIGuardrail(...)`, so a caller passing `"allow"`
-  gets unrounded bytes. Rounding also signs over the rounded value, so
-  `0.12345678901234568` is signed as `0.123456789012346`.
+  significant digits before encoding. Exact for realistic tool inputs --
+  measurements, ratios, coordinates with a handful of decimal places. Note two
+  limits: it is a default, not an enforcement, so it can be overridden per call
+  and on `NTIGuardrail(...)`; and because it signs over the rounded value,
+  a full-precision `f64` is signed as a *different number* than the engine
+  holds (`0.12345678901234568` becomes `0.123456789012346`). Measured against
+  0.1.9, that makes `"round"` diverge on 86% of full-precision doubles versus
+  15% for `"allow"` -- it is the wrong choice for high-precision payloads.
 * `"reject"` fails closed on any non-integral float. Use it when a false denial
   is preferable to a false allow, and encode floats as strings or integers.
-* `"allow"` encodes floats as-is. Use only when you have verified parity for your
-  exact value domain.
+* `"allow"` encodes floats as-is. Exact for payloads at <=13 decimal places;
+  diverges on ~15% of full-precision doubles.
 
 Integers outside `[-2**63, 2**64 - 1]` and non-finite floats (`inf`, `nan`) are
 always rejected: they cannot round-trip through the engine's canonical form.

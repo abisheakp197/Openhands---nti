@@ -93,3 +93,25 @@ def test_round_policy_accepts_realistic_floats_against_engine():
     payload = {"temperature": 0.5, "ratio": 3.25, "limit": 100.0}
     message = action_message("req-1", ACTOR, CAPABILITY, "bash", payload)
     assert _engine_accepts(payload, message)
+
+
+@pytest.mark.parametrize("places", [2, 6, 10, 13])
+def test_both_policies_are_exact_at_reduced_precision(places):
+    # The Python-vs-ryu disagreement needs ~17 significant digits to appear.
+    for policy in ("allow", "round"):
+        value = round(0.1234567890123456789, places)
+        message = action_message(
+            "req-1", ACTOR, CAPABILITY, "bash", {"x": value}, float_policy=policy
+        )
+        assert _engine_accepts({"x": value}, message), (policy, places)
+
+
+def test_round_policy_signs_a_different_number_than_the_engine():
+    # Guards the documented hazard: "round" rewrites the value to 15 significant
+    # digits, so what gets signed is not the number the engine holds. This is
+    # why "round" is the wrong default for full-precision payloads.
+    value = 0.12345678901234568
+    rounded = canonical_json({"x": value}, float_policy="round")
+    allowed = canonical_json({"x": value}, float_policy="allow")
+    assert rounded != allowed
+    assert b'"x":0.123456789012346' in rounded

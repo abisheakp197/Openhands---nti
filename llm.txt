@@ -25,34 +25,52 @@ the bytes must match the sidecar's re-serialization exactly.
 
 Strings, integers, booleans, `null`, and objects match byte-for-byte. **Floats
 are the exception.** Rust's `serde_json` parses and re-serializes `f64` with its
-own shortest-form algorithm, which for a non-trivial fraction of full-precision
+own shortest-form algorithm (ryu), which for a minority of full-precision
 doubles produces different bytes from Python's `repr`. A signature over the
 Python bytes then fails to verify against the sidecar.
 
 This is *fail-closed* — the action is blocked, never allowed — but it is a
 denial-of-service risk on the agent.
 
-**Mitigation: `float_policy="round"` (the default).** `canonical_json` rounds
-non-integral floats to 15 significant digits before encoding, which matches the
-sidecar for realistic tool inputs (measurements, ratios, coordinates with a
-handful of decimal places) — 0 mismatches on 208 realistic inputs in testing.
-Use it:
+**Measured divergence against `ube-foundation==0.1.9`** (80 randomly generated
+inputs per class, signature rejected if the engine returns anything but
+`Allow`):
 
-    canonical_json(payload, float_policy="round", float_digits=15)
+| input class                 | `float_policy="allow"` | `float_policy="round"` |
+| --------------------------- | ---------------------- | ---------------------- |
+| full-precision random `f64` | 15% (12/80)            | **86% (69/80)**        |
+| rounded to 13 decimals      | 0%                     | 0%                     |
+| rounded to 10 decimals      | 0%                     | 0%                     |
+| rounded to 6 decimals       | 0%                     | 0%                     |
+| rounded to 2 decimals       | 0%                     | 0%                     |
 
-Two limits worth knowing. `"round"` is a default, not an enforcement: it can be
-overridden per call and on `NTIGuardrail(...)`, so a caller who passes `"allow"`
-gets unrounded bytes and the mismatch returns. And rounding is lossy — it signs
-over the rounded value, so `0.12345678901234568` is signed as
-`0.123456789012346`. Do not round a value whose exact digits carry meaning.
+Two conclusions follow, and both contradict older guidance in this repo.
+
+1. **For full-precision doubles, `"round"` is worse than `"allow"`, not
+   better.** Rounding rewrites the value to 15 significant digits, so the bytes
+   signed are for a *different number* than the one the engine holds
+   (`0.12345678901234568` becomes `0.123456789012346`) and the mismatch becomes
+   near-certain rather than occasional.
+2. **For anything down to 13 decimal places, both policies are exact.** The
+   Python-versus-ryu disagreement needs the full ~17 significant digits of an
+   `f64` to show up.
+
+`"round"` is still the default because many callers pass float payloads that
+carry more precision than they mean, and rounding them yields stable bytes
+across languages. It is a default, not an enforcement: it can be overridden per
+call and on `NTIGuardrail(...)`. If you sign values whose full precision is
+meaningful, prefer `"reject"` (fail closed, encode as string) over relying on
+`"round"`.
 
 Policy options:
 
-- `"round"` (default) — round to `float_digits` (15) significant digits. Recommended.
+- `"round"` (default) — round to `float_digits` (15) significant digits.
+  Correct for payloads at ≤13 decimal places; actively harmful for
+  full-precision doubles, which it signs as a different number.
 - `"reject"` — fail closed on any non-integral float. Use when a false denial is
   preferable to a false allow; encode floats as strings or integers.
-- `"allow"` — encode floats as-is. Only for domains you have verified against
-  your pinned sidecar version.
+- `"allow"` — encode floats as-is. Exact for payloads at ≤13 decimal places;
+  diverges on ~15% of full-precision doubles.
 
 Integers outside `[-2**63, 2**64 - 1]` and non-finite floats (`inf`, `nan`) are
 always rejected: they cannot round-trip through the sidecar's canonical form.

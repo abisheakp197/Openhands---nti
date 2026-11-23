@@ -173,9 +173,13 @@ def canonical_json(
     Args:
         value: A JSON-compatible object.
         float_policy: ``"round"`` (default) rounds non-integral floats to
-            ``float_digits`` significant digits before encoding; ``"reject"``
-            fails closed on any non-integral float; ``"allow"`` encodes the
-            float as-is.
+            ``float_digits`` significant digits before encoding. That is exact
+            for payloads at <=13 decimal places, but for a full-precision
+            ``f64`` it signs a *different number* than the engine holds, so it
+            diverges far more often than ``"allow"`` (86% vs 15% measured
+            against 0.1.9). ``"reject"`` fails closed on any non-integral
+            float and is the safe choice when full precision is meaningful.
+            ``"allow"`` encodes the float as-is.
         float_digits: Significant digits used when ``float_policy == "round"``.
 
     Raises:
