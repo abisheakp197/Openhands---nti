@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openhands-nti"
-version = "0.1.0"
+version = "0.1.1"
 description = "Drop-in Neutral Trust Infrastructure guardrail for OpenHands: ML-DSA-87 signed receipts and Merkle delegation-chain verification on every agent action."
 readme = "README.md"
 requires-python = ">=3.10"

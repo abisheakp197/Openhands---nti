@@ -20,6 +20,9 @@ client tool call is intercepted before it runs, signed, verified against the
 delegation chain, and recorded. Denials fail closed: the tool never executes.
 """
 
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
+
 from openhands_nti.audit import AuditTrail
 from openhands_nti.canonical import action_message, canonical_json
 from openhands_nti.delegation import (
@@ -47,7 +50,10 @@ from openhands_nti.receipt import (
     verify_receipt,
 )
 
-__version__ = "0.1.0"
+try:
+    __version__ = _version("openhands-nti")
+except PackageNotFoundError:  # imported from a source tree that was never installed
+    __version__ = "0.0.0+unknown"
 
 __all__ = [
     "AuditTrail",

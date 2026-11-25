@@ -24,6 +24,19 @@ jobs:
         run: |
           python -m pip install dist/*.whl
           python -c "import openhands_nti; print(openhands_nti.__version__)"
+      - name: Verify __version__ resolves from installed metadata
+        run: |
+          python - <<'EOF'
+          import importlib.metadata as md
+          import openhands_nti
+
+          assert openhands_nti.__version__ == md.version("openhands-nti"), (
+              f"runtime {openhands_nti.__version__!r} != dist-info "
+              f"{md.version('openhands-nti')!r}"
+          )
+          assert openhands_nti.__version__ != "0.0.0+unknown", "metadata lookup failed"
+          print("version resolves:", openhands_nti.__version__)
+          EOF
       - uses: actions/upload-artifact@v4
         with:
           name: dist
