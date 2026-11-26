@@ -30,7 +30,7 @@ classifiers = [
     "Topic :: Security :: Cryptography",
 ]
 dependencies = [
-    "ube-foundation>=0.2.0",
+    "ube-foundation>=0.2.1",
 ]
 
 [project.optional-dependencies]
